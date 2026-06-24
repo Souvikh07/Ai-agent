@@ -74,6 +74,15 @@ export default function LoginPage() {
               {loading ? "Logging in..." : "Login"}
             </button>
           </div>
+          <p className="text-center mt-4 text-sm">
+            Don't have an account?{" "}
+            <span
+              onClick={() => navigate("/signup")}
+              className="link link-primary cursor-pointer"
+            >
+              Sign Up
+            </span>
+          </p>
         </form>
       </div>
     </div>

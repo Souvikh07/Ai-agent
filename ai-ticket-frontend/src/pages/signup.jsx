@@ -77,6 +77,15 @@ export default function SignupPage() {
               {loading ? "Signing up..." : "Sign Up"}
             </button>
           </div>
+          <p className="text-center mt-4 text-sm">
+            Already have an account?{" "}
+            <span
+              onClick={() => navigate("/login")}
+              className="link link-primary cursor-pointer"
+            >
+              Login
+            </span>
+          </p>
         </form>
       </div>
     </div>
