@@ -14,8 +14,28 @@ dotenv.config();
 const PORT = process.env.PORT || 3000;
 const app = express();
 
-app.use(cors());
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.APP_URL,
+  "http://localhost:5173",
+  "http://localhost:3000",
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
+
+app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
 app.use("/api/auth", userRoutes);
 app.use("/api/tickets", ticketRoutes);
@@ -32,6 +52,6 @@ mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
     console.log("MongoDB connected ✅");
-    app.listen(PORT, () => console.log("🚀 Server at http://localhost:3000"));
+    app.listen(PORT, () => console.log(`🚀 Server at http://localhost:${PORT}`));
   })
   .catch((err) => console.error("❌ MongoDB error: ", err));

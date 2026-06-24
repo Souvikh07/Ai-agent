@@ -1,27 +1,25 @@
 import brcypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/user.js";
-import { inngest } from "../inngest/client.js";
+import { sendInngestEvent } from "../utils/inngest-events.js";
 
 export const signup = async (req, res) => {
   const { email, password, skills = [] } = req.body;
   try {
-    const hashed = brcypt.hash(password, 10);
+    const hashed = await brcypt.hash(password, 10);
     const user = await User.create({ email, password: hashed, skills });
-
-    //Fire inngest event
-
-    await inngest.send({
-      name: "user/signup",
-      data: {
-        email,
-      },
-    });
 
     const token = jwt.sign(
       { _id: user._id, role: user.role },
       process.env.JWT_SECRET
     );
+
+    await sendInngestEvent({
+      name: "user/signup",
+      data: {
+        email,
+      },
+    });
 
     res.json({ user, token });
   } catch (error) {
@@ -33,7 +31,7 @@ export const login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const user = User.findOne({ email });
+    const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ error: "User not found" });
 
     const isMatch = await brcypt.compare(password, user.password);
