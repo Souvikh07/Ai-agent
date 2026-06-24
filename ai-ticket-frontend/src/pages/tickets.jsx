@@ -14,6 +14,12 @@ export default function Tickets() {
         headers: { Authorization: `Bearer ${token}` },
         method: "GET",
       });
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+        return;
+      }
       const data = await res.json();
       setTickets(data.tickets || []);
     } catch (err) {
