@@ -1,4 +1,12 @@
 ai-ticket-assistant/.env
+ai-ticket-assistant/.env.production
+ai-ticket-assistant/.env.local
 ai-ticket-assistant/node_modules
-ai-ticket-frontend/node_modules
 ai-ticket-frontend/.env
+ai-ticket-frontend/.env.production
+ai-ticket-frontend/.env.vercel
+ai-ticket-frontend/.env.local
+ai-ticket-frontend/node_modules
+*.local
+test-body.json
+test-ticket.json
