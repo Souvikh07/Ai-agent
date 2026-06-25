@@ -19,6 +19,7 @@ const allowedOrigins = [
   process.env.APP_URL,
   "http://localhost:5173",
   "http://localhost:3000",
+  "https://ai-ticket-frontend-ebon.vercel.app",
 ].filter(Boolean);
 
 app.use(
@@ -35,6 +36,25 @@ app.use(
 );
 app.use(express.json());
 
+let isConnected = false;
+
+const connectDB = async () => {
+  if (isConnected) return;
+  await mongoose.connect(process.env.MONGO_URI);
+  isConnected = true;
+  console.log("MongoDB connected ✅");
+};
+
+app.use(async (_req, _res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error("❌ MongoDB error:", err);
+    next(err);
+  }
+});
+
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
 app.use("/api/auth", userRoutes);
@@ -48,10 +68,14 @@ app.use(
   })
 );
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("MongoDB connected ✅");
-    app.listen(PORT, () => console.log(`🚀 Server at http://localhost:${PORT}`));
-  })
-  .catch((err) => console.error("❌ MongoDB error: ", err));
+if (!process.env.VERCEL) {
+  connectDB()
+    .then(() => {
+      app.listen(PORT, () =>
+        console.log(`🚀 Server at http://localhost:${PORT}`)
+      );
+    })
+    .catch((err) => console.error("❌ MongoDB error: ", err));
+}
+
+export default app;

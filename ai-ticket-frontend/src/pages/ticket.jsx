@@ -6,10 +6,15 @@ export default function TicketDetailsPage() {
   const { id } = useParams();
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
 
   const token = localStorage.getItem("token");
 
   useEffect(() => {
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 10;
+
     const fetchTicket = async () => {
       try {
         const res = await fetch(
@@ -22,20 +27,54 @@ export default function TicketDetailsPage() {
         );
         const data = await res.json();
         if (res.ok) {
-          setTicket(data.ticket);
-        } else {
+          const nextTicket = data.ticket;
+          if (!cancelled) {
+            setTicket(nextTicket);
+            const aiReady =
+              nextTicket.priority ||
+              nextTicket.helpfulNotes ||
+              nextTicket.relatedSkills?.length > 0;
+            setProcessing(!aiReady && attempts < maxAttempts);
+          }
+          return nextTicket;
+        }
+        if (!cancelled) {
           alert(data.message || "Failed to fetch ticket");
         }
       } catch (err) {
         console.error(err);
-        alert("Something went wrong");
+        if (!cancelled) {
+          alert("Something went wrong");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+      return null;
+    };
+
+    const poll = async () => {
+      const nextTicket = await fetchTicket();
+      const aiReady =
+        nextTicket?.priority ||
+        nextTicket?.helpfulNotes ||
+        nextTicket?.relatedSkills?.length > 0;
+
+      if (!aiReady && attempts < maxAttempts) {
+        attempts += 1;
+        setTimeout(poll, 3000);
+      } else if (!cancelled) {
+        setProcessing(false);
       }
     };
 
-    fetchTicket();
-  }, [id]);
+    poll();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, token]);
 
   if (loading)
     return <div className="text-center mt-10">Loading ticket details...</div>;
@@ -45,11 +84,16 @@ export default function TicketDetailsPage() {
     <div className="max-w-3xl mx-auto p-4">
       <h2 className="text-2xl font-bold mb-4">Ticket Details</h2>
 
+      {processing && (
+        <div className="alert alert-info mb-4">
+          AI is analyzing your ticket — this usually takes 10–20 seconds...
+        </div>
+      )}
+
       <div className="card bg-gray-800 shadow p-4 space-y-4">
         <h3 className="text-xl font-semibold">{ticket.title}</h3>
         <p>{ticket.description}</p>
 
-        {/* Conditionally render extended details */}
         {ticket.status && (
           <>
             <div className="divider">Metadata</div>
@@ -78,9 +122,21 @@ export default function TicketDetailsPage() {
               </div>
             )}
 
+            {!ticket.priority &&
+              !ticket.helpfulNotes &&
+              !ticket.relatedSkills?.length &&
+              !processing && (
+                <p className="text-sm text-gray-400">
+                  AI analysis is not available for this ticket yet.
+                </p>
+              )}
+
             {ticket.assignedTo && (
               <p>
-                <strong>Assigned To:</strong> {ticket.assignedTo?.email}
+                <strong>Assigned To:</strong>{" "}
+                {typeof ticket.assignedTo === "object"
+                  ? ticket.assignedTo.email
+                  : ticket.assignedTo}
               </p>
             )}
 

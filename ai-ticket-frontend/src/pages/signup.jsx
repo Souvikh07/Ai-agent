@@ -32,7 +32,7 @@ export default function SignupPage() {
         localStorage.setItem("user", JSON.stringify(data.user));
         navigate("/");
       } else {
-        alert(data.message || "Signup failed");
+        alert(data.error || data.message || "Signup failed");
       }
     } catch (err) {
       alert("Something went wrong");

@@ -2,13 +2,16 @@ import { inngest } from "../inngest/client.js";
 
 export const sendInngestEvent = async (event) => {
   if (!process.env.INNGEST_EVENT_KEY && process.env.INNGEST_DEV !== "1") {
-    console.warn("Inngest event skipped: configure INNGEST_EVENT_KEY or INNGEST_DEV=1");
+    console.error(
+      "Inngest event skipped: set INNGEST_EVENT_KEY in production or INNGEST_DEV=1 locally"
+    );
     return;
   }
 
   try {
     await inngest.send(event);
+    console.log(`Inngest event sent: ${event.name}`);
   } catch (error) {
-    console.warn("Inngest event failed (non-blocking):", error.message);
+    console.error("Inngest event failed:", error.message);
   }
 };

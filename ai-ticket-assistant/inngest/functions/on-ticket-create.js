@@ -14,7 +14,7 @@ export const onTicketCreated = inngest.createFunction(
       //fetch ticket from DB
       const ticket = await step.run("fetch-ticket", async () => {
         const ticketObject = await Ticket.findById(ticketId);
-        if (!ticket) {
+        if (!ticketObject) {
           throw new NonRetriableError("Ticket not found");
         }
         return ticketObject;
@@ -25,32 +25,36 @@ export const onTicketCreated = inngest.createFunction(
       });
 
       const relatedskills = await step.run("ai-processing", async () => {
-        let skills = [];
         const aiResponse = await analyzeTicket(ticket);
-        if (aiResponse) {
-          await Ticket.findByIdAndUpdate(ticket._id, {
-            priority: !["low", "medium", "high"].includes(aiResponse.priority)
-              ? "medium"
-              : aiResponse.priority,
-            helpfulNotes: aiResponse.helpfulNotes,
-            status: "IN_PROGRESS",
-            relatedSkills: aiResponse.relatedSkills,
-          });
-          skills = aiResponse.relatedSkills;
-        }
+        const priority = ["low", "medium", "high"].includes(aiResponse.priority)
+          ? aiResponse.priority
+          : "medium";
+        const helpfulNotes = aiResponse.helpfulNotes;
+        const skills = aiResponse.relatedSkills ?? [];
+
+        await Ticket.findByIdAndUpdate(ticket._id, {
+          priority,
+          helpfulNotes,
+          status: "IN_PROGRESS",
+          relatedSkills: skills,
+        });
+
         return skills;
       });
 
       const moderator = await step.run("assign-moderator", async () => {
-        let user = await User.findOne({
-          role: "moderator",
-          skills: {
-            $elemMatch: {
-              $regex: relatedskills.join("|"),
-              $options: "i",
+        let user = null;
+        if (relatedskills?.length > 0) {
+          user = await User.findOne({
+            role: "moderator",
+            skills: {
+              $elemMatch: {
+                $regex: relatedskills.join("|"),
+                $options: "i",
+              },
             },
-          },
-        });
+          });
+        }
         if (!user) {
           user = await User.findOne({
             role: "admin",
@@ -63,13 +67,16 @@ export const onTicketCreated = inngest.createFunction(
       });
 
       await step.run("send-email-notification", async () => {
-        if (moderator) {
+        if (!moderator) return;
+        try {
           const finalTicket = await Ticket.findById(ticket._id);
           await sendMail(
             moderator.email,
             "Ticket Assigned",
             `A new ticket is assigned to you ${finalTicket.title}`
           );
+        } catch (error) {
+          console.error("Email notification failed:", error.message);
         }
       });
 

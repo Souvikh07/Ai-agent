@@ -68,7 +68,9 @@ export const getTicket = async (req, res) => {
       ticket = await Ticket.findOne({
         createdBy: user._id,
         _id: req.params.id,
-      }).select("title description status priority relatedSkills helpfulNotes assignedTo createdAt");
+      })
+        .select("title description status priority relatedSkills helpfulNotes assignedTo createdAt")
+        .populate("assignedTo", ["email", "_id"]);
     }
 
     if (!ticket) {
