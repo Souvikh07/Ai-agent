@@ -9,7 +9,7 @@
     "inngest-dev": "npx inngest-cli@latest dev"
   },
   "keywords": [],
-  "author": "",
+  "author": "Souvikh07",
   "license": "ISC",
   "description": "",
   "devDependencies": {

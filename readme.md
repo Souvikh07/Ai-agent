@@ -1,52 +1,70 @@
-# AI-Ticket-Assistant - ChaiCode
+# 🤖 AI-Powered Ticket Management System
 
-Welcome to the AI-Powered Ticket Management System!
-This course is a part of Chaicode youtube video series. This project is a web application that uses AI to automatically categorize, prioritize, and assign support tickets to the most appropriate moderators.
+A full-stack intelligent support ticket platform built and maintained by **Souvikh07**. It uses AI to automatically analyze, prioritize, and route tickets to the right team members — reducing response time and manual triage effort.
 
-# AI-Powered Ticket Management System
+> **Live Demo:** [ai-ticket-frontend-ebon.vercel.app](https://ai-ticket-frontend-ebon.vercel.app)
 
-A smart ticket management system that uses AI to automatically categorize, prioritize, and assign support tickets to the most appropriate moderators.
+---
 
-## 🚀 Features
+## ✨ Key Features
 
-- **AI-Powered Ticket Processing**
+### 🧠 AI-Powered Ticket Processing
+- Automatic ticket categorization and skill extraction
+- Smart priority assignment (low / medium / high / critical)
+- AI-generated contextual notes tailored to each ticket (issues, requests, or learning questions)
+- Smart rule-based fallback with topic-specific guidance when Gemini is unavailable
 
-  - Automatic ticket categorization
-  - Smart priority assignment
-  - Skill-based moderator matching
-  - AI-generated helpful notes for moderators
+### 🎯 Intelligent Moderator Assignment
+- Skill-based matching — tickets route to the most qualified moderator
+- Automatic fallback to admin when no match is found
+- Real-time assignment updates on the frontend
 
-- **Smart Moderator Assignment**
+### 👥 Role-Based Access Control
+- **User** — create and track tickets
+- **Moderator** — view assigned tickets with AI insights
+- **Admin** — manage users, roles, skills, and view all tickets
 
-  - Automatic matching of tickets to moderators based on skills
-  - Fallback to admin assignment if no matching moderator found
-  - Skill-based routing system
+### ⚡ Event-Driven Architecture
+- Background processing via [Inngest](https://www.inngest.com/) — decoupled from HTTP requests
+- Automatic retries on failure
+- Email notifications to assigned moderators via Nodemailer
 
-- **User Management**
-
-  - Role-based access control (User, Moderator, Admin)
-  - Skill management for moderators
-  - User authentication with JWT
-
-- **Background Processing**
-  - Event-driven architecture using Inngest
-  - Automated email notifications
-  - Asynchronous ticket processing
+---
 
 ## 🛠️ Tech Stack
 
-- **Backend**: Node.js with Express
-- **Database**: MongoDB
-- **Authentication**: JWT
-- **Background Jobs**: Inngest
-- **AI Integration**: Google Gemini API
-- **Email**: Nodemailer with Mailtrap
-- **Development**: Nodemon for hot reloading
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React, Vite, React Router, Tailwind CSS, DaisyUI |
+| **Backend** | Node.js, Express 5 |
+| **Database** | MongoDB (Mongoose ODM) |
+| **Authentication** | JWT (JSON Web Tokens) |
+| **Background Jobs** | Inngest (event-driven functions) |
+| **AI** | Google Gemini API + rule-based fallback |
+| **Email** | Nodemailer + Mailtrap (dev) |
+| **Deployment** | Vercel (frontend + backend) |
+
+---
+
+## 🏗️ Architecture
+
+```
+User creates ticket
+  → Express API saves to MongoDB
+  → Inngest event: ticket/created
+  → Step 1: AI analyzes ticket (Gemini API)
+  → Step 2: Sets priority, skills, helpful notes
+  → Step 3: Assigns best-matching moderator (or admin fallback)
+  → Step 4: Sends email notification
+  → Frontend polls and displays AI results
+```
+
+---
 
 ## 📋 Prerequisites
 
-- Node.js (v14 or higher)
-- MongoDB
+- Node.js (v18 or higher)
+- MongoDB (local or Atlas)
 - Google Gemini API key
 - Mailtrap account (for email testing)
 
@@ -55,18 +73,27 @@ A smart ticket management system that uses AI to automatically categorize, prior
 1. **Clone the repository**
 
    ```bash
-   git clone <repository-url>
-   cd ai-ticket-assistant
+   git clone https://github.com/Souvikh07/Ai-agent.git
+   cd Ai-agent
    ```
 
-2. **Install dependencies**
+2. **Install backend dependencies**
 
    ```bash
+   cd ai-ticket-assistant
    npm install
    ```
 
-3. **Environment Setup**
-   Create a `.env` file in the root directory with the following variables:
+3. **Install frontend dependencies**
+
+   ```bash
+   cd ../ai-ticket-frontend
+   npm install
+   ```
+
+4. **Environment Setup**
+
+   Create a `.env` file in `ai-ticket-assistant/`:
 
    ```env
    # MongoDB
@@ -88,130 +115,109 @@ A smart ticket management system that uses AI to automatically categorize, prior
    APP_URL=http://localhost:3000
    ```
 
-## 🚀 Running the Application
+   Create a `.env` file in `ai-ticket-frontend/`:
 
-1. **Start the main server**
+   ```env
+   VITE_API_URL=http://localhost:3000
+   ```
+
+## 🚀 Running Locally
+
+1. **Start the backend**
 
    ```bash
+   cd ai-ticket-assistant
    npm run dev
    ```
 
 2. **Start the Inngest dev server**
+
    ```bash
-   npm run inngest-dev
+   npx inngest-cli@latest dev
    ```
+
+3. **Start the frontend**
+
+   ```bash
+   cd ai-ticket-frontend
+   npm run dev
+   ```
+
+---
 
 ## 📝 API Endpoints
 
 ### Authentication
-
-- `POST /api/auth/signup` - Register a new user
-- `POST /api/auth/login` - Login and get JWT token
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/signup` | Register a new user |
+| POST | `/api/auth/login` | Login and receive JWT |
 
 ### Tickets
-
-- `POST /api/tickets` - Create a new ticket
-- `GET /api/tickets` - Get all tickets for logged-in user
-- `GET /api/tickets/:id` - Get ticket details
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/tickets` | Create a new ticket |
+| GET | `/api/tickets` | Get all tickets for logged-in user |
+| GET | `/api/tickets/:id` | Get ticket details with AI analysis |
 
 ### Admin
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/auth/users` | Get all users (Admin only) |
+| POST | `/api/auth/update-user` | Update user role & skills (Admin only) |
 
-- `GET /api/auth/users` - Get all users (Admin only)
-- `POST /api/auth/update-user` - Update user role & skills (Admin only)
+---
 
-## 🔄 Ticket Processing Flow
+## 🔄 Ticket Processing Pipeline
 
-1. **Ticket Creation**
+1. **Ticket Creation** — User submits a ticket with title and description
+2. **AI Analysis** — Inngest triggers background function; Gemini API extracts skills, priority, type, and generates helpful notes
+3. **Moderator Assignment** — System matches ticket skills to moderator skills using regex-based matching; falls back to admin if no match
+4. **Notification** — Email sent to assigned moderator with ticket details and AI-generated context
 
-   - User submits a ticket with title and description
-   - System creates initial ticket record
-
-2. **AI Processing**
-
-   - Inngest triggers `on-ticket-created` event
-   - AI analyzes ticket content
-   - Generates:
-     - Required skills
-     - Priority level
-     - Helpful notes
-     - Ticket type
-
-3. **Moderator Assignment**
-
-   - System searches for moderators with matching skills
-   - Uses regex-based skill matching
-   - Falls back to admin if no match found
-   - Updates ticket with assignment
-
-4. **Notification**
-   - Sends email to assigned moderator
-   - Includes ticket details and AI-generated notes
-
-## 🧪 Testing
-
-1. **Start the Inngest dev server**
-
-   ```bash
-   npm run inngest-dev
-   ```
-
-   This will start the Inngest development server at http://localhost:8288
-
-2. **Test Ticket Creation**
-   ```bash
-   curl -X POST http://localhost:3000/api/tickets \
-   -H "Content-Type: application/json" \
-   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-   -d '{
-     "title": "Database Connection Issue",
-     "description": "Experiencing intermittent database connection timeouts"
-   }'
-   ```
+---
 
 ## 🔍 Troubleshooting
 
-### Common Issues
+| Issue | Solution |
+|-------|----------|
+| AI fields not appearing | Check `GEMINI_API_KEY` in env; contextual fallback notes are generated automatically |
+| Generic helpful notes | Ensure `GEMINI_API_KEY` is set on Render; fallback now provides ticket-specific guidance |
+| Email not sending | Verify Mailtrap SMTP credentials |
+| Port conflicts | Kill process on conflicting port and restart |
+| Tickets not assigning | Ensure at least one admin exists in the database |
 
-1. **Port Conflicts**
-   If you see "address already in use" error:
+---
 
-   ```bash
-   # Find process using port 8288
-   lsof -i :8288
-   # Kill the process
-   kill -9 <PID>
-   ```
+## 📦 Dependencies
 
-2. **AI Processing Errors**
+### Backend
+`express` · `mongoose` · `bcrypt` · `jsonwebtoken` · `cors` · `dotenv` · `inngest` · `nodemailer` · `@google/generative-ai`
 
-   - Verify GEMINI_API_KEY in .env
-   - Check API quota and limits
-   - Validate request format
+### Frontend
+`react` · `react-router-dom` · `vite` · `tailwindcss` · `daisyui` · `axios`
 
-3. **Email Issues**
-   - Verify Mailtrap credentials
-   - Check SMTP settings
-   - Monitor email delivery logs
+---
 
-## 📚 Dependencies
+## 🌐 Deployment
 
-- `@inngest/agent-kit`: ^0.7.3
-- `bcrypt`: ^5.1.1
-- `cors`: ^2.8.5
-- `dotenv`: ^16.5.0
-- `express`: ^5.1.0
-- `inngest`: ^3.35.0
-- `jsonwebtoken`: ^9.0.2
-- `mongoose`: ^8.13.2
-- `nodemailer`: ^6.10.1
+| Service | URL |
+|---------|-----|
+| Frontend | [ai-ticket-frontend-ebon.vercel.app](https://ai-ticket-frontend-ebon.vercel.app) |
+| Backend API | [ai-ticket-assistant-orcin.vercel.app](https://ai-ticket-assistant-orcin.vercel.app) |
+| GitHub | [github.com/Souvikh07/Ai-agent](https://github.com/Souvikh07/Ai-agent) |
 
-## 🤝 Contributing
+---
 
-we don't accept contributions for this project, as this is a part of a video and code files needs to given as it is.
+## 👤 Author
 
-## 🙏 Acknowledgments
+**Souvikh07** — sole developer and maintainer of this project.
 
-- Inngest for background job processing
-- Google Gemini for AI capabilities
-- Mailtrap for email testing
-- MongoDB for database
+- GitHub: [github.com/Souvikh07](https://github.com/Souvikh07)
+- Repository: [github.com/Souvikh07/Ai-agent](https://github.com/Souvikh07/Ai-agent)
+
+---
+
+## 📄 License
+
+MIT License — free to use with attribution.
