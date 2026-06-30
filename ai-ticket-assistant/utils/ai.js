@@ -34,10 +34,10 @@ Ticket:
 - Description: ${ticket.description}`;
 
 const SKILL_KEYWORDS = {
-  React: /\b(react|jsx|frontend|ui|component)\b/i,
-  "Node.js": /\b(node|express|backend|api|server)\b/i,
+  React: /\b(react|jsx|frontend|ui|component|hooks?)\b/i,
+  "Node.js": /\b(node\.?js|express|backend|server-side|rest api)\b/i,
   MongoDB: /\b(mongo|database|db|atlas|connection pool)\b/i,
-  JavaScript: /\b(javascript|js|typescript|ts)\b/i,
+  JavaScript: /\b(javascript|js|typescript|ts|promise|async|await|fetch)\b/i,
   DevOps: /\b(deploy|vercel|docker|ci\/cd|pipeline|504|timeout)\b/i,
   Security: /\b(auth|login|password|token|jwt|unauthorized|reset)\b/i,
   Payments: /\b(stripe|payment|checkout|billing|webhook)\b/i,
@@ -169,7 +169,7 @@ const inferSkills = (text) =>
     .slice(0, 4);
 
 const detectTicketIntent = (text) => {
-  if (/\b(explain|what is|what are|how does|how do|teach|learn|describe|components of|difference between)\b/i.test(text)) {
+  if (/\b(explain|what is|what are|how does|how do|teach|learn|describe|components of|difference between|show me|help me understand)\b/i.test(text)) {
     return "question";
   }
   if (/\b(reset|forgot|forgotten|recover|change my password)\b/i.test(text)) {
@@ -190,9 +190,238 @@ const detectTicketIntent = (text) => {
   return "general";
 };
 
+const detectQuestionTopic = (text) => {
+  if (/\b(hooks?|usestate|useeffect|usecontext|usereducer|usememo|usecallback|useref|custom hook)\b/i.test(text)) {
+    return "react_hooks";
+  }
+  if (/\b(components?|jsx|props|rendering)\b/i.test(text) && /\breact\b/i.test(text)) {
+    return "react_components";
+  }
+  if (/\b(react router|routing|context api|redux|state management)\b/i.test(text)) {
+    return "react_advanced";
+  }
+  if (/\breact\b/i.test(text)) {
+    return "react_general";
+  }
+  if (/\b(promises?|async|await|fetch api|fetch\()\b/i.test(text)) {
+    return "js_async";
+  }
+  if (/\b(closures?|hoisting|scope|event loop|prototype|this keyword)\b/i.test(text)) {
+    return "js_concepts";
+  }
+  if (/\b(javascript|typescript|\bjs\b|\bts\b)\b/i.test(text)) {
+    return "javascript_general";
+  }
+  return "general_question";
+};
+
+const QUESTION_ANSWERS = {
+  react_hooks: [
+    "**Answer for the moderator to share:**",
+    "",
+    "React **Hooks** let function components use state and lifecycle features without classes.",
+    "",
+    "**Core hooks:**",
+    "1. **`useState`** — store and update local component state.",
+    "2. **`useEffect`** — run side effects after render (API calls, subscriptions, DOM updates).",
+    "3. **`useContext`** — read shared data from a React Context provider.",
+    "",
+    "**Rules of Hooks:**",
+    "- Only call hooks at the top level of a function component (not inside loops/conditions).",
+    "- Only call hooks from React function components or custom hooks.",
+    "",
+    "**Example:**",
+    "```jsx",
+    "import { useState, useEffect } from 'react';",
+    "",
+    "function UserProfile({ userId }) {",
+    "  const [user, setUser] = useState(null);",
+    "",
+    "  useEffect(() => {",
+    "    fetch(`/api/users/${userId}`)",
+    "      .then(res => res.json())",
+    "      .then(setUser);",
+    "  }, [userId]);",
+    "",
+    "  if (!user) return <p>Loading...</p>;",
+    "  return <h1>{user.name}</h1>;",
+    "}",
+    "```",
+    "",
+    "**Useful resources:**",
+    "- [React Docs — Introducing Hooks](https://react.dev/reference/react)",
+    "- [React Docs — useState](https://react.dev/reference/react/useState)",
+    "- [React Docs — useEffect](https://react.dev/reference/react/useEffect)",
+  ].join("\n"),
+
+  react_components: [
+    "**Answer for the moderator to share:**",
+    "",
+    "React **components** are reusable pieces of UI. The main ideas are:",
+    "",
+    "1. **Function components** — JavaScript functions that return JSX (most common today).",
+    "2. **JSX** — syntax that looks like HTML but compiles to JavaScript function calls.",
+    "3. **Props** — read-only inputs passed from a parent component to a child.",
+    "4. **State** — data a component manages locally, usually with the `useState` hook.",
+    "5. **Composition** — build complex UIs by nesting smaller components.",
+    "",
+    "**Example:**",
+    "```jsx",
+    "function Greeting({ name }) {",
+    "  const [count, setCount] = useState(0);",
+    "  return (",
+    "    <button onClick={() => setCount(count + 1)}>",
+    "      Hello {name} — clicked {count} times",
+    "    </button>",
+    "  );",
+    "}",
+    "```",
+    "",
+    "**Useful resources:**",
+    "- [React Docs — Your First Component](https://react.dev/learn/your-first-component)",
+    "- [React Docs — Passing Props](https://react.dev/learn/passing-props-to-a-component)",
+    "- [React Docs — State: A Component's Memory](https://react.dev/learn/state-a-components-memory)",
+  ].join("\n"),
+
+  react_general: [
+    "**Answer for the moderator to share:**",
+    "",
+    "React is a JavaScript library for building user interfaces with reusable components.",
+    "",
+    "**Key concepts:** components, JSX, props, state, hooks, and one-way data flow.",
+    "",
+    "Ask the user which area they want to go deeper on — components, hooks, routing, or state management — and share the relevant React docs section.",
+    "",
+    "**Useful resources:**",
+    "- [React Docs — Quick Start](https://react.dev/learn)",
+    "- [React Docs — Thinking in React](https://react.dev/learn/thinking-in-react)",
+  ].join("\n"),
+
+  react_advanced: [
+    "**Answer for the moderator to share:**",
+    "",
+    "For advanced React topics (routing, Context, Redux, etc.), start with the user's specific question in the description.",
+    "",
+    "**Common topics:**",
+    "- **React Router** — client-side navigation between pages",
+    "- **Context API** — share state without prop drilling",
+    "- **Redux / Zustand** — global state management for larger apps",
+    "",
+    "**Useful resources:**",
+    "- [React Router](https://reactrouter.com/)",
+    "- [React Docs — Passing Data Deeply with Context](https://react.dev/learn/passing-data-deeply-with-context)",
+  ].join("\n"),
+
+  js_async: [
+    "**Answer for the moderator to share:**",
+    "",
+    "JavaScript handles asynchronous work with **Promises**, **async/await**, and the **Fetch API**.",
+    "",
+    "**1. Promises** — represent a value that will be available later.",
+    "```javascript",
+    "const promise = new Promise((resolve, reject) => {",
+    "  setTimeout(() => resolve('Done!'), 1000);",
+    "});",
+    "",
+    "promise.then(result => console.log(result)).catch(err => console.error(err));",
+    "```",
+    "",
+    "**2. async/await** — cleaner syntax for working with promises.",
+    "```javascript",
+    "async function getUser(id) {",
+    "  try {",
+    "    const response = await fetch(`https://api.example.com/users/${id}`);",
+    "    const user = await response.json();",
+    "    return user;",
+    "  } catch (error) {",
+    "    console.error('Failed to fetch user:', error);",
+    "  }",
+    "}",
+    "```",
+    "",
+    "**3. Fetch API** — built-in way to make HTTP requests in the browser.",
+    "```javascript",
+    "fetch('/api/tickets')",
+    "  .then(res => {",
+    "    if (!res.ok) throw new Error('Network error');",
+    "    return res.json();",
+    "  })",
+    "  .then(data => console.log(data))",
+    "  .catch(err => console.error(err));",
+    "```",
+    "",
+    "**Key points:**",
+    "- `async` functions always return a Promise.",
+    "- `await` pauses inside an `async` function until the Promise settles.",
+    "- Always handle errors with `try/catch` or `.catch()`.",
+    "",
+    "**Useful resources:**",
+    "- [MDN — Using Promises](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Using_promises)",
+    "- [MDN — async function](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/async_function)",
+    "- [MDN — Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch)",
+  ].join("\n"),
+
+  js_concepts: [
+    "**Answer for the moderator to share:**",
+    "",
+    "Cover the specific concept the user asked about (closures, hoisting, scope, etc.) with a short definition and a minimal code example.",
+    "",
+    "**Useful resources:**",
+    "- [MDN — JavaScript Guide](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide)",
+    "- [javascript.info](https://javascript.info/)",
+  ].join("\n"),
+
+  javascript_general: [
+    "**Answer for the moderator to share:**",
+    "",
+    "JavaScript is the programming language of the web. Core areas include variables, functions, objects, arrays, DOM manipulation, and asynchronous code.",
+    "",
+    "Use the ticket description to focus the answer on what the user actually asked.",
+    "",
+    "**Useful resources:**",
+    "- [MDN — JavaScript Guide](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide)",
+    "- [javascript.info](https://javascript.info/)",
+  ].join("\n"),
+
+  general_question: [
+    "**Answer for the moderator to share:**",
+    "",
+    "Read the ticket title and description carefully, then provide a structured explanation:",
+    "1. Brief definition of the topic",
+    "2. Key concepts broken into bullet points",
+    "3. A short code example if applicable",
+    "4. Links to official documentation",
+  ].join("\n"),
+};
+
+const buildQuestionSummary = (ticket, topic) => {
+  const description = ticket.description?.trim();
+  const title = ticket.title?.trim() || "support question";
+
+  if (description) {
+    return `User is asking: ${description}`;
+  }
+
+  const topicSummaries = {
+    react_hooks: "User wants to learn about React hooks.",
+    react_components: "User wants to learn about React components.",
+    react_general: "User has a general React learning question.",
+    js_async: "User wants to learn about Promises, async/await, and the Fetch API.",
+    javascript_general: "User has a JavaScript learning question.",
+  };
+
+  return topicSummaries[topic] || `User is asking: ${title}`;
+};
+
 const buildContextualNotes = (ticket, intent, skills) => {
   const title = ticket.title.trim();
   const description = ticket.description?.trim() || "";
+  const text = `${title} ${description}`;
+
+  if (intent === "question") {
+    const topic = detectQuestionTopic(text);
+    return QUESTION_ANSWERS[topic] || QUESTION_ANSWERS.general_question;
+  }
 
   switch (intent) {
     case "password_reset":
@@ -225,40 +454,6 @@ const buildContextualNotes = (ticket, intent, skills) => {
         "- Wrong credentials or unregistered email",
         "- Missing or expired JWT token in localStorage",
         "- Backend env vars not set on Render/Vercel",
-      ].join("\n");
-
-    case "question":
-      if (/\breact\b/i.test(`${title} ${description}`)) {
-        return [
-          "**Answer for the moderator to share:**",
-          "",
-          "React components are reusable pieces of UI. The main ideas are:",
-          "",
-          "1. **Function components** — JavaScript functions that return JSX (most common today).",
-          "2. **JSX** — syntax that looks like HTML but compiles to JavaScript function calls.",
-          "3. **Props** — read-only inputs passed from a parent component to a child.",
-          "4. **State** — data a component manages locally, usually with the `useState` hook.",
-          "5. **Hooks** — functions like `useState`, `useEffect`, and `useContext` that add behavior to function components.",
-          "",
-          "**Example:**",
-          "```jsx",
-          "function Greeting({ name }) {",
-          "  const [count, setCount] = useState(0);",
-          "  return <button onClick={() => setCount(count + 1)}>Hello {name}</button>;",
-          "}",
-          "```",
-          "",
-          "**Useful resources:**",
-          "- [React Docs — Your First Component](https://react.dev/learn/your-first-component)",
-          "- [React Docs — Passing Props](https://react.dev/learn/passing-props-to-a-component)",
-          "- [React Docs — State: A Component's Memory](https://react.dev/learn/state-a-components-memory)",
-        ].join("\n");
-      }
-
-      return [
-        "**Answer for the moderator to share:**",
-        "Provide a clear, structured explanation based on the user's question above.",
-        "Break the topic into key concepts, give a short example if helpful, and link to official documentation.",
       ].join("\n");
 
     case "deployment":
@@ -311,9 +506,10 @@ const buildFallbackAnalysis = (ticket) => {
   const skills = inferSkills(text);
   const priority = inferPriority(text);
   const intent = detectTicketIntent(text);
+  const questionTopic = intent === "question" ? detectQuestionTopic(text) : null;
   const summary =
     intent === "question"
-      ? `User is asking: ${ticket.title}`
+      ? buildQuestionSummary(ticket, questionTopic)
       : intent === "password_reset"
         ? "User needs help resetting their password."
         : intent === "login_issue"
