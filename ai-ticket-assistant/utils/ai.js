@@ -168,6 +168,17 @@ const inferSkills = (text) =>
     .map(([skill]) => skill)
     .slice(0, 4);
 
+const INTENT_SKILLS = {
+  critical_outage: ["DevOps", "Node.js", "MongoDB"],
+  database: ["MongoDB", "Node.js"],
+  deployment: ["DevOps", "Node.js"],
+  session_token: ["Security", "Node.js"],
+  login_failure: ["Security"],
+  login_issue: ["Security"],
+  password_reset: ["Security"],
+  react: ["React", "JavaScript"],
+};
+
 const detectTicketIntent = (text) => {
   if (/\b(explain|what is|what are|how does|how do|teach|learn|describe|components of|difference between|show me|help me understand)\b/i.test(text)) {
     return "question";
@@ -175,14 +186,26 @@ const detectTicketIntent = (text) => {
   if (/\b(reset|forgot|forgotten|recover|change my password)\b/i.test(text)) {
     return "password_reset";
   }
-  if (/\b(login|log in|sign in|signin|authentication|auth|unauthorized|401)\b/i.test(text)) {
-    return "login_issue";
+  if (
+    /\b(critical|urgent|outage|entire app|whole app|app is down|system down|service down|production down|all users)\b/i.test(text) ||
+    (/\b(down|offline|unavailable|not working)\b/i.test(text) && /\b(app|site|system|service|platform)\b/i.test(text))
+  ) {
+    return "critical_outage";
   }
-  if (/\b(deploy|deployment|vercel|render|504|timeout|build fail)\b/i.test(text)) {
+  if (/\b(mongo|mongodb|database|db connection|atlas|connection pool)\b/i.test(text)) {
+    return "database";
+  }
+  if (/\b(deploy|deployment|vercel|render|504|build fail)\b/i.test(text)) {
     return "deployment";
   }
-  if (/\b(mongo|database|db|connection|atlas)\b/i.test(text)) {
-    return "database";
+  if (/\b(session token|token expir|jwt expir|expires immediately|logged out|keeps logging out|log out after|token invalid)\b/i.test(text)) {
+    return "session_token";
+  }
+  if (/\b(cannot login|can't login|cant login|unable to login|unauthorized|invalid credentials|wrong password|login fail|login error)\b/i.test(text)) {
+    return "login_failure";
+  }
+  if (/\b(login|log in|sign in|signin|authentication|auth)\b/i.test(text)) {
+    return "login_issue";
   }
   if (/\b(react|jsx|component|frontend|ui)\b/i.test(text)) {
     return "react";
@@ -413,6 +436,23 @@ const buildQuestionSummary = (ticket, topic) => {
   return topicSummaries[topic] || `User is asking: ${title}`;
 };
 
+const buildIssueSummary = (ticket, intent) => {
+  const description = ticket.description?.trim();
+  const title = ticket.title?.trim() || "";
+
+  const intentSummaries = {
+    critical_outage: description || "Critical production outage affecting all users.",
+    database: description || "Database connectivity or performance issue reported.",
+    deployment: description || "Deployment or hosting issue reported.",
+    session_token: description || "User session or JWT token is expiring unexpectedly.",
+    login_failure: description || "User cannot log in with valid credentials.",
+    login_issue: description || "User reported an authentication or login problem.",
+    password_reset: "User needs help resetting their password.",
+  };
+
+  return intentSummaries[intent] || description || title;
+};
+
 const buildContextualNotes = (ticket, intent, skills) => {
   const title = ticket.title.trim();
   const description = ticket.description?.trim() || "";
@@ -442,18 +482,58 @@ const buildContextualNotes = (ticket, intent, skills) => {
       ].join("\n");
 
     case "login_issue":
+    case "login_failure":
       return [
         "**Recommended resolution:**",
-        "1. Ask which error message the user sees (invalid credentials, token expired, network error).",
-        "2. Verify the email/password combination and that the account exists and is active.",
-        "3. Check JWT_SECRET is set in production and matches across deployments.",
-        "4. Confirm CORS and API URL on the frontend point to the correct backend.",
-        "5. Inspect browser devtools Network tab for failed `/api/auth/login` requests.",
+        "1. Ask which exact error message appears (invalid credentials, unauthorized, network error).",
+        "2. Verify the email/password and confirm the account exists in the database.",
+        "3. Test the `/api/auth/login` endpoint directly with the user's credentials.",
+        "4. Check JWT_SECRET is set in production and matches across deployments.",
+        "5. Confirm CORS settings and `VITE_SERVER_URL` on the frontend point to the correct backend.",
+        "6. Inspect browser devtools → Network tab for failed login requests and response status codes.",
         "",
         "**Common causes:**",
         "- Wrong credentials or unregistered email",
-        "- Missing or expired JWT token in localStorage",
-        "- Backend env vars not set on Render/Vercel",
+        "- bcrypt password hash mismatch after a database restore",
+        "- Backend env vars missing on Vercel/Render",
+        "- Typo in API URL causing requests to hit the wrong server",
+      ].join("\n");
+
+    case "session_token":
+      return [
+        "**Recommended resolution:**",
+        "1. Confirm whether login succeeds briefly before the user is logged out.",
+        "2. Check if the JWT is issued without an `expiresIn` option or with a very short expiry.",
+        "3. Inspect `jsonwebtoken.sign()` in the auth controller — ensure a reasonable expiry (e.g. `7d`).",
+        "4. Verify `JWT_SECRET` has not changed between login and subsequent API calls.",
+        "5. Check if the frontend clears `localStorage` token on page refresh or route change.",
+        "6. Look for 401 responses on protected routes immediately after login in the Network tab.",
+        "",
+        "**Common causes:**",
+        "- JWT signed with no expiry or `expiresIn: '1s'` by mistake",
+        "- Token stored incorrectly (sessionStorage vs localStorage)",
+        "- Auth middleware rejecting valid tokens due to secret mismatch",
+        "- Frontend redirecting to login before token is saved",
+      ].join("\n");
+
+    case "critical_outage":
+      return [
+        "**Immediate actions (treat as P1):**",
+        "1. Confirm the outage scope — is the frontend, backend, or database down?",
+        "2. Check Vercel/Render deployment status and recent deploys.",
+        "3. Hit the `/health` endpoint and verify the backend responds.",
+        "4. Check MongoDB Atlas cluster status and connection count.",
+        "5. Review error logs in Vercel Functions / Render logs for the last 30 minutes.",
+        "6. Roll back to the last known good deployment if a recent deploy caused the outage.",
+        "",
+        "**Likely root causes:**",
+        "- Recent deployment with missing env vars (`MONGO_URI`, `JWT_SECRET`)",
+        "- MongoDB Atlas IP whitelist blocking the server",
+        "- Backend crash loop due to unhandled exception",
+        "- Inngest or background job failure blocking ticket processing",
+        "",
+        "**Communication:**",
+        "- Update ticket status and notify affected users once service is restored.",
       ].join("\n");
 
     case "deployment":
@@ -503,18 +583,17 @@ const buildContextualNotes = (ticket, intent, skills) => {
 
 const buildFallbackAnalysis = (ticket) => {
   const text = `${ticket.title} ${ticket.description}`;
-  const skills = inferSkills(text);
-  const priority = inferPriority(text);
   const intent = detectTicketIntent(text);
+  const inferredSkills = inferSkills(text);
+  const skills =
+    INTENT_SKILLS[intent] ||
+    (inferredSkills.length ? inferredSkills : ["General Support"]);
+  const priority = inferPriority(text);
   const questionTopic = intent === "question" ? detectQuestionTopic(text) : null;
   const summary =
     intent === "question"
       ? buildQuestionSummary(ticket, questionTopic)
-      : intent === "password_reset"
-        ? "User needs help resetting their password."
-        : intent === "login_issue"
-          ? "User is experiencing a login or authentication issue."
-          : ticket.description?.trim() || ticket.title;
+      : buildIssueSummary(ticket, intent);
 
   const helpfulNotes = formatHelpfulNotes(
     summary,
@@ -523,7 +602,7 @@ const buildFallbackAnalysis = (ticket) => {
 
   return {
     priority,
-    relatedSkills: skills.length ? skills : ["General Support"],
+    relatedSkills: skills,
     helpfulNotes,
   };
 };
